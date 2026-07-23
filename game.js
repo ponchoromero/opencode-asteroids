@@ -150,6 +150,8 @@ class Ship {
     this.dead          = false;
     this.speedMultiplier = 1;
     this.speedTimer = 0;
+    this.shieldActive = false;
+    this.shieldTimer = 0;
   }
 
   update(dt) {
@@ -159,6 +161,10 @@ class Ship {
     if (this.speedTimer    > 0) {
       this.speedTimer -= dt;
       if (this.speedTimer <= 0) this.speedMultiplier = 1;
+    }
+    if (this.shieldTimer > 0) {
+      this.shieldTimer -= dt;
+      if (this.shieldTimer <= 0) this.shieldActive = false;
     }
 
     const ROT   = 3.5;   // rad/s
@@ -280,13 +286,14 @@ class Particle {
 
 // ── PowerUp (Velocidad) ────────────────────────────────────────────────────
 class PowerUp {
-  constructor(x, y) {
+  constructor(x, y, type = 'speed') {
     this.x = x;
     this.y = y;
     this.radius = 10;
     this.rot = 0;
     this.dead = false;
     this.ttl = 8;
+    this.type = type;
   }
 
   update(dt) {
@@ -299,15 +306,29 @@ class PowerUp {
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.rot);
-    ctx.strokeStyle = '#0ff';
     ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, -this.radius);
-    ctx.lineTo(this.radius, 0);
-    ctx.lineTo(0, this.radius);
-    ctx.lineTo(-this.radius, 0);
-    ctx.closePath();
-    ctx.stroke();
+    if (this.type === 'speed') {
+      ctx.strokeStyle = '#0ff';
+      ctx.beginPath();
+      ctx.moveTo(0, -this.radius);
+      ctx.lineTo(this.radius, 0);
+      ctx.lineTo(0, this.radius);
+      ctx.lineTo(-this.radius, 0);
+      ctx.closePath();
+      ctx.stroke();
+    } else {
+      ctx.strokeStyle = '#0f0';
+      ctx.beginPath();
+      ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+      ctx.stroke();
+      // Inner cross
+      ctx.beginPath();
+      ctx.moveTo(0, -this.radius * 0.55);
+      ctx.lineTo(0, this.radius * 0.55);
+      ctx.moveTo(-this.radius * 0.55, 0);
+      ctx.lineTo(this.radius * 0.55, 0);
+      ctx.stroke();
+    }
     ctx.restore();
   }
 }
@@ -421,10 +442,21 @@ function update(dt) {
   asteroids = asteroids.filter(a => !a.dead).concat(newAsteroids);
   bullets   = bullets.filter(b => !b.dead);
 
-  // Nave vs asteroide
-  if (ship.invincible <= 0) {
+  // Escudo destruye asteroides
+  if (ship.shieldActive) {
     for (const a of asteroids) {
-      if (dist(ship, a) < ship.radius + a.radius * 0.82) {
+      if (!a.dead && dist(ship, a) < ship.radius + 8 + a.radius * 0.82) {
+        a.dead = true;
+        score += POINTS[a.size];
+        explode(a.x, a.y, a.size * 5);
+      }
+    }
+  }
+
+  // Nave vs asteroide (solo sin escudo)
+  if (ship.invincible <= 0 && !ship.shieldActive) {
+    for (const a of asteroids) {
+      if (!a.dead && dist(ship, a) < ship.radius + a.radius * 0.82) {
         killShip();
         break;
       }
@@ -439,7 +471,8 @@ function update(dt) {
       x = rand(0, W);
       y = rand(0, H);
     } while (dist({ x, y }, ship) < 130);
-    powerUps.push(new PowerUp(x, y));
+    const type = Math.random() < 0.5 ? 'speed' : 'shield';
+    powerUps.push(new PowerUp(x, y, type));
     powerUpTimer = rand(8, 12);
   }
 
@@ -448,8 +481,13 @@ function update(dt) {
 
   for (const p of powerUps) {
     if (dist(ship, p) < ship.radius + p.radius) {
-      ship.speedMultiplier = 2;
-      ship.speedTimer = 5;
+      if (p.type === 'speed') {
+        ship.speedMultiplier = 2;
+        ship.speedTimer = 5;
+      } else {
+        ship.shieldActive = true;
+        ship.shieldTimer = 5;
+      }
       explode(p.x, p.y, 6);
       p.dead = true;
     }
@@ -509,6 +547,12 @@ function drawHUD() {
     ctx.fillText(`VELOCIDAD ${ship.speedTimer.toFixed(1)}s`, 14, 46);
   }
 
+  if (ship.shieldTimer > 0) {
+    ctx.fillStyle = '#0f0';
+    ctx.textAlign = 'left';
+    ctx.fillText(`ESCUDO ${ship.shieldTimer.toFixed(1)}s`, 14, ship.speedTimer > 0 ? 66 : 46);
+  }
+
 }
 
 function drawOverlay(title, sub) {
@@ -530,6 +574,18 @@ function draw() {
   bullets.forEach(b => b.draw());
   powerUps.forEach(p => p.draw());
   ship.draw();
+
+  // Escudo visual
+  if (ship.shieldActive && ship.shieldTimer > 0) {
+    const pulse = 0.7 + 0.3 * Math.sin(Date.now() / 150);
+    ctx.beginPath();
+    ctx.arc(ship.x, ship.y, ship.radius + 8, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(0,255,0,${(0.4 * pulse).toFixed(2)})`;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    ctx.fillStyle = `rgba(0,255,0,${(0.08 * pulse).toFixed(2)})`;
+    ctx.fill();
+  }
 
   drawHUD();
 
