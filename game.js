@@ -133,9 +133,48 @@ class Asteroid {
   }
 }
 
+// ── Skins ─────────────────────────────────────────────────────────────────────
+const SKINS = [
+  {
+    name: 'CLÁSICA',
+    color: '#fff',
+    boostColor: '#0ff',
+    verts: [[20, 0], [-12, -9], [-7, 0], [-12, 9]],
+    lifeVerts: [[9, 0], [-6, -5], [-3, 0], [-6, 5]],
+    flame: { x: -8, len: [6, 14], color: 'rgba(255,130,0,0.85)' }
+  },
+  {
+    name: 'SIGILO',
+    color: '#888',
+    boostColor: '#0ff',
+    verts: [[18, 0], [-12, -10], [-3, 0], [-12, 10]],
+    lifeVerts: [[8, 0], [-5, -6], [-3, 0], [-5, 6]],
+    flame: null
+  },
+  {
+    name: 'CAZADOR',
+    color: '#f44',
+    boostColor: '#fa0',
+    verts: [[24, 0], [-14, -7], [-9, 0], [-14, 7]],
+    lifeVerts: [[10, 0], [-7, -4], [-4, 0], [-7, 4]],
+    flame: { x: -10, len: [5, 12], color: 'rgba(255,200,50,0.85)' }
+  },
+  {
+    name: 'FÉNIX',
+    color: '#fa0',
+    boostColor: '#fff',
+    verts: [[22, 0], [-11, -8], [-6, 0], [-11, 8]],
+    lifeVerts: [[9, 0], [-5, -5], [-3, 0], [-5, 5]],
+    flame: { x: -8, len: [8, 18], color: 'rgba(255,100,0,0.9)' }
+  },
+];
+
 // ── Ship ──────────────────────────────────────────────────────────────────────
 class Ship {
-  constructor() { this.reset(); }
+  constructor() {
+    this.skinIndex = parseInt(localStorage.getItem('asteroids-skin')) || 0;
+    this.reset();
+  }
 
   reset() {
     this.x      = W / 2;
@@ -191,32 +230,31 @@ class Ship {
 
   draw() {
     if (this.dead) return;
-    // Parpadeo durante invencibilidad de reaparición
     if (this.invincible > 0 && Math.floor(this.invincible * 8) % 2 === 0) return;
+
+    const skin = SKINS[this.skinIndex];
 
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.angle);
-    ctx.strokeStyle = this.speedMultiplier > 1 ? '#0ff' : '#fff';
+    ctx.strokeStyle = this.speedMultiplier > 1 ? skin.boostColor : skin.color;
     ctx.lineWidth   = 1.5;
     ctx.lineJoin    = 'round';
 
-    // Silueta clásica: triángulo con muesca trasera
     ctx.beginPath();
-    ctx.moveTo( 20,  0);   // nariz
-    ctx.lineTo(-12, -9);   // ala izquierda
-    ctx.lineTo( -7,  0);   // muesca trasera
-    ctx.lineTo(-12,  9);   // ala derecha
+    ctx.moveTo(skin.verts[0][0], skin.verts[0][1]);
+    for (let i = 1; i < skin.verts.length; i++)
+      ctx.lineTo(skin.verts[i][0], skin.verts[i][1]);
     ctx.closePath();
     ctx.stroke();
 
-    // Llama del propulsor
-    if (this.thrusting && Math.random() > 0.35) {
+    if (this.thrusting && skin.flame && Math.random() > 0.35) {
+      const f = skin.flame;
       ctx.beginPath();
-      ctx.moveTo(-8, -4);
-      ctx.lineTo(-8 - rand(6, 14), 0);
-      ctx.lineTo(-8,  4);
-      ctx.strokeStyle = 'rgba(255, 130, 0, 0.85)';
+      ctx.moveTo(f.x, -4);
+      ctx.lineTo(f.x - rand(f.len[0], f.len[1]), 0);
+      ctx.lineTo(f.x,  4);
+      ctx.strokeStyle = f.color;
       ctx.stroke();
     }
 
@@ -398,6 +436,12 @@ function update(dt) {
   }
 
   ship.update(dt);
+
+  if (pressed('KeyS')) {
+    ship.skinIndex = (ship.skinIndex + 1) % SKINS.length;
+    localStorage.setItem('asteroids-skin', ship.skinIndex);
+  }
+
   bullets.forEach(b => b.update(dt));
   asteroids.forEach(a => a.update(dt));
   particles.forEach(p => p.update(dt));
@@ -474,17 +518,17 @@ function update(dt) {
 
 // ── Draw ──────────────────────────────────────────────────────────────────────
 function drawLifeIcon(x, y) {
+  const skin = SKINS[ship.skinIndex];
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(-Math.PI / 2);
-  ctx.strokeStyle = '#fff';
+  ctx.strokeStyle = skin.color;
   ctx.lineWidth   = 1.2;
   ctx.lineJoin    = 'round';
   ctx.beginPath();
-  ctx.moveTo( 9,  0);
-  ctx.lineTo(-6, -5);
-  ctx.lineTo(-3,  0);
-  ctx.lineTo(-6,  5);
+  ctx.moveTo(skin.lifeVerts[0][0], skin.lifeVerts[0][1]);
+  for (let i = 1; i < skin.lifeVerts.length; i++)
+    ctx.lineTo(skin.lifeVerts[i][0], skin.lifeVerts[i][1]);
   ctx.closePath();
   ctx.stroke();
   ctx.restore();
