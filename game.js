@@ -150,6 +150,7 @@ class Ship {
     this.dead          = false;
     this.speedMultiplier = 1;
     this.speedTimer = 0;
+
   }
 
   update(dt) {
@@ -160,6 +161,7 @@ class Ship {
       this.speedTimer -= dt;
       if (this.speedTimer <= 0) this.speedMultiplier = 1;
     }
+
 
     const ROT   = 3.5;   // rad/s
     const THRUST = 260;  // px/s²
@@ -184,9 +186,14 @@ class Ship {
     if (this.shootCooldown > 0 || this.dead) return [];
     this.shootCooldown = 0.2;
     const NOSE = 21;
+    const SPREAD = 0.18;
     const ox = this.x + Math.cos(this.angle) * NOSE;
     const oy = this.y + Math.sin(this.angle) * NOSE;
-    return [new Bullet(ox, oy, this.angle)];
+    return [
+      new Bullet(ox, oy, this.angle - SPREAD),
+      new Bullet(ox, oy, this.angle),
+      new Bullet(ox, oy, this.angle + SPREAD),
+    ];
   }
 
   draw() {
@@ -278,15 +285,17 @@ class Particle {
   }
 }
 
-// ── PowerUp (Velocidad) ────────────────────────────────────────────────────
+// ── PowerUp ────────────────────────────────────────────────────────────
 class PowerUp {
-  constructor(x, y) {
+  constructor(x, y, type) {
     this.x = x;
     this.y = y;
     this.radius = 10;
     this.rot = 0;
     this.dead = false;
     this.ttl = 8;
+    this.type = type;
+    this.color = type === 'triple' ? '#0f0' : '#0ff';
   }
 
   update(dt) {
@@ -299,15 +308,24 @@ class PowerUp {
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.rot);
-    ctx.strokeStyle = '#0ff';
+    ctx.strokeStyle = this.color;
     ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, -this.radius);
-    ctx.lineTo(this.radius, 0);
-    ctx.lineTo(0, this.radius);
-    ctx.lineTo(-this.radius, 0);
-    ctx.closePath();
-    ctx.stroke();
+    if (this.type === 'triple') {
+      // Triángulo con 3 puntitos
+      ctx.beginPath();
+      ctx.arc(0, -5, 2.5, 0, Math.PI * 2);
+      ctx.arc(-4, 3, 2.5, 0, Math.PI * 2);
+      ctx.arc(4, 3, 2.5, 0, Math.PI * 2);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(0, -this.radius);
+      ctx.lineTo(this.radius, 0);
+      ctx.lineTo(0, this.radius);
+      ctx.lineTo(-this.radius, 0);
+      ctx.closePath();
+      ctx.stroke();
+    }
     ctx.restore();
   }
 }
@@ -439,7 +457,8 @@ function update(dt) {
       x = rand(0, W);
       y = rand(0, H);
     } while (dist({ x, y }, ship) < 130);
-    powerUps.push(new PowerUp(x, y));
+    const type = Math.random() < 0.5 ? 'speed' : 'triple';
+    powerUps.push(new PowerUp(x, y, type));
     powerUpTimer = rand(8, 12);
   }
 
@@ -448,8 +467,10 @@ function update(dt) {
 
   for (const p of powerUps) {
     if (dist(ship, p) < ship.radius + p.radius) {
-      ship.speedMultiplier = 2;
-      ship.speedTimer = 5;
+      if (p.type === 'speed') {
+        ship.speedMultiplier = 2;
+        ship.speedTimer = 5;
+      }
       explode(p.x, p.y, 6);
       p.dead = true;
     }
